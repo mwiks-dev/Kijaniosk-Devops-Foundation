@@ -1,0 +1,84 @@
+# Week 3 Friday Pre-Provisioning Audit
+# Date: 2026-04-07T14:17:34+03:00
+
+$ getent passwd kk-api kk-payments kk-logs
+kk-api:x:999:994:KijaniKiosk API Service:/nonexistent:/usr/sbin/nologin
+kk-payments:x:997:1002:KijaniKiosk Payments Service:/nonexistent:/usr/sbin/nologin
+kk-logs:x:996:1003:KijaniKiosk Log Service:/nonexistent:/usr/sbin/nologin
+
+$ getent group kijanikiosk
+kijanikiosk:x:1001:kk-api,vodca,kk-payments,kk-logs
+
+$ ls -la /opt/kijanikiosk/
+total 36
+drwxrwxrwx 9 root root 4096 Apr  7 14:10 .
+drwxr-xr-x 8 root root 4096 Apr  1 15:02 ..
+drwxrwxrwx 2 root root 4096 Apr  7 14:10 api
+drwxrwxrwx 2 root root 4096 Apr  1 15:02 app
+drwxrwxrwx 2 root root 4096 Apr  7 14:10 config
+drwxrwxrwx 2 root root 4096 Apr  7 14:10 logs
+drwxrwxrwx 2 root root 4096 Apr  7 14:10 payments
+drwxrwxrwx 2 root root 4096 Apr  7 14:15 scripts
+drwxrwxrwx 3 root root 4096 Apr  7 14:10 shared
+
+$ getfacl /opt/kijanikiosk/shared/logs/ 2>/dev/null
+# file: opt/kijanikiosk/shared/logs/
+# owner: root
+# group: root
+user::rwx
+group::rwx
+other::rwx
+
+
+$ getfacl /opt/kijanikiosk/config/ 2>/dev/null
+# file: opt/kijanikiosk/config/
+# owner: root
+# group: root
+user::rwx
+group::rwx
+other::rwx
+
+
+$ sudo ufw status numbered
+Status: active
+
+     To                         Action      From
+     --                         ------      ----
+[ 1] 3001/tcp                   DENY IN     Anywhere                  
+[ 2] 3001/tcp (v6)              DENY IN     Anywhere (v6)             
+
+
+$ apt-mark showhold
+curl
+
+$ systemctl list-unit-files | grep kk-
+
+$ sudo systemd-analyze security kk-api.service 2>/dev/null | head -5
+
+$ du -sh /opt/kijanikiosk/shared/logs/
+4.0K	/opt/kijanikiosk/shared/logs/
+
+$ journalctl --disk-usage
+Archived and active journals take up 1.1G in the file system.
+
+# Interpretation of dirty-state conditions found
+# - kk-api, kk-payments, kk-logs already exist
+# - kijanikiosk group already exists
+# - /opt/kijanikiosk/config has intentionally bad permissions
+# - deploy.sh has dangerous SUID/bad mode from simulated Tuesday state
+# - ufw has extra deny 3001 rule
+# - curl is already held
+
+![Terminal showing partial dirty state before script runs](Screenshot from 2026-04-07 14-18-31.png)
+
+# Interpretation of dirty-state conditions found
+# - kk-api already exists before provisioning: handled in Phase 2 by ensure_user()
+# - kk-payments group existed before provisioning and can conflict with user creation: handled in Phase 2 by explicit user/group checks
+# - kijanikiosk group already exists before provisioning: handled in Phase 2 by ensure_group()
+# - /opt/kijanikiosk directory tree already exists from prior manual setup: handled in Phase 3 by ownership/mode reset
+# - /opt/kijanikiosk/config permissions were intentionally made too open for dirty-state simulation: fixed in Phase 3 by restoring secure ownership and modes
+# - deploy.sh was created with dangerous permissions during dirty-state simulation: fixed in Phase 3 by removing SUID and resetting ownership/mode
+# - ufw contains an extra deny 3001 rule from dirty-state simulation: fixed in Phase 5 by resetting ufw and applying intent-based rules
+# - curl is already held before provisioning: detected in Phase 1 during package/hold validation
+# - kk-* unit files may be absent or partially present depending on previous setup: handled in Phase 4 by rewriting all unit files from the script
+# - ACLs on shared/logs and config may be missing or inconsistent on this VM: fixed in Phase 3 by reapplying the final access model
