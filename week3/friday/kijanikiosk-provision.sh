@@ -42,7 +42,7 @@ LOG_USER="kk-logs"
 PLATFORM_GROUP="kijanikiosk"
 
 
-NGINX_VERSION="${NGINX_VERSION:-1.24.0-2ubuntu7.3}"
+NGINX_VERSION="${NGINX_VERSION:-1.24.0-2ubuntu7.6}"
 NODEJS_VERSION="${NODEJS_VERSION:-18.19.1+dfsg-6ubuntu5}"
 
 MONITORING_CIDR="10.0.1.0/24"
@@ -528,6 +528,7 @@ ${SHARED_LOG_DIR}/*.log {
     compress
     delaycompress
     dateext
+    su ${LOG_USER} ${PLATFORM_GROUP}
     create 0640 ${LOG_USER} ${PLATFORM_GROUP}
     sharedscripts
     postrotate
@@ -599,23 +600,58 @@ verify_filesystem() {
 
 verify_systemd() {
   local ok=0
-  systemctl list-unit-files | grep -q '^kk-api\.service' && pass "kk-api unit installed" || { record_failure "kk-api unit missing"; ok=1; }
-  systemctl list-unit-files | grep -q '^kk-payments\.service' && pass "kk-payments unit installed" || { record_failure "kk-payments unit missing"; ok=1; }
-  systemctl list-unit-files | grep -q '^kk-logs\.service' && pass "kk-logs unit installed" || { record_failure "kk-logs unit missing"; ok=1; }
-  systemctl is-enabled kk-api.service >/dev/null 2>&1 && pass "kk-api enabled" || { record_failure "kk-api not enabled"; ok=1; }
-  systemctl is-enabled kk-payments.service >/dev/null 2>&1 && pass "kk-payments enabled" || { record_failure "kk-payments not enabled"; ok=1; }
-  systemctl is-enabled kk-logs.service >/dev/null 2>&1 && pass "kk-logs enabled" || { record_failure "kk-logs not enabled"; ok=1; }
+
+  systemctl cat kk-api.service >/dev/null 2>&1 \
+    && pass "kk-api unit installed" \
+    || { record_failure "kk-api unit missing"; ok=1; }
+
+  systemctl cat kk-payments.service >/dev/null 2>&1 \
+    && pass "kk-payments unit installed" \
+    || { record_failure "kk-payments unit missing"; ok=1; }
+
+  systemctl cat kk-logs.service >/dev/null 2>&1 \
+    && pass "kk-logs unit installed" \
+    || { record_failure "kk-logs unit missing"; ok=1; }
+
+  systemctl is-enabled kk-api.service >/dev/null 2>&1 \
+    && pass "kk-api enabled" \
+    || { record_failure "kk-api not enabled"; ok=1; }
+
+  systemctl is-enabled kk-payments.service >/dev/null 2>&1 \
+    && pass "kk-payments enabled" \
+    || { record_failure "kk-payments not enabled"; ok=1; }
+
+  systemctl is-enabled kk-logs.service >/dev/null 2>&1 \
+    && pass "kk-logs enabled" \
+    || { record_failure "kk-logs not enabled"; ok=1; }
+
   return "$ok"
 }
 
 verify_firewall() {
   local ok=0
   local status
-  status="$(ufw status)"
-  echo "$status" | grep -q "22/tcp.*ALLOW" && pass "SSH allowed" || { record_failure "SSH allow missing"; ok=1; }
-  echo "$status" | grep -q "80/tcp.*ALLOW" && pass "HTTP allowed" || { record_failure "HTTP allow missing"; ok=1; }
-  echo "$status" | grep -q "3001/tcp.*DENY" && pass "port 3001 deny present" || { record_failure "port 3001 deny missing"; ok=1; }
-  echo "$status" | grep -q "${MONITORING_CIDR}.*3001/tcp" && pass "monitoring CIDR allowed to 3001" || { record_failure "monitoring CIDR allow missing"; ok=1; }
+  status="$(sudo ufw status)"
+
+  echo "$status" | grep -q "22/tcp.*ALLOW" \
+    && pass "SSH allowed" \
+    || { record_failure "SSH rule missing"; ok=1; }
+
+  echo "$status" | grep -q "80/tcp.*ALLOW" \
+    && pass "HTTP allowed" \
+    || { record_failure "HTTP rule missing"; ok=1; }
+
+  echo "$status" | grep -q "3001/tcp.*DENY" \
+    && pass "port 3001 deny present" \
+    || { record_failure "port 3001 deny rule missing"; ok=1; }
+
+  if echo "$status" | grep -q "10.0.1.0/24" && echo "$status" | grep -q "3001/tcp"; then
+    pass "monitoring CIDR allowed to 3001"
+  else
+    record_failure "monitoring CIDR allow missing"
+    ok=1
+  fi
+
   return "$ok"
 }
 
