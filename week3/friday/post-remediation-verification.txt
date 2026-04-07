@@ -1,0 +1,134 @@
+# Week 3 Friday Post-Remediation Verification
+# Date: 2026-04-07T15:43:15+03:00
+
+$ df -h /
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda6       365G  129G  217G  38% /
+
+$ sudo du -sh /opt/kijanikiosk/shared/logs/
+12K	/opt/kijanikiosk/shared/logs/
+
+$ sudo logrotate --force --debug /etc/logrotate.d/kijanikiosk
+
+$ sudo logrotate --force /etc/logrotate.d/kijanikiosk
+
+$ sudo ls -la /opt/kijanikiosk/shared/logs/
+total 16
+drwxrwx---+ 2 kk-logs kijanikiosk 4096 Apr  7 15:43 .
+drwxr-x---  3 root    kijanikiosk 4096 Apr  7 14:10 ..
+-rw-r-----+ 1 kk-logs kijanikiosk    0 Apr  7 15:43 payments-test.log
+-rw-rw----+ 1 root    root          30 Apr  7 15:43 payments-test.log-20260407
+-rw-rw----+ 1 kk-api  kk-api         0 Apr  7 15:40 test-write.tmp
+
+$ sudo getfacl /opt/kijanikiosk/shared/logs/
+# file: opt/kijanikiosk/shared/logs/
+# owner: kk-logs
+# group: kijanikiosk
+user::rwx
+user:kk-payments:r-x
+user:kk-api:rwx
+user:vodca:r-x
+group::r-x
+mask::rwx
+other::---
+default:user::rwx
+default:user:kk-payments:r-x
+default:user:kk-api:rwx
+default:user:vodca:r-x
+default:group::r-x
+default:mask::rwx
+default:other::---
+
+
+$ sudo -u kk-api touch /opt/kijanikiosk/shared/logs/test-write.tmp && echo "PASS: kk-api can write after logrotate" || echo "FAIL: kk-api cannot write to shared/logs"
+PASS: kk-api can write after logrotate
+
+$ sudo ufw status numbered
+Status: active
+
+     To                         Action      From
+     --                         ------      ----
+[ 1] 22/tcp                     ALLOW IN    Anywhere                   # Allow SSH administration
+[ 2] 80/tcp                     ALLOW IN    Anywhere                   # Allow HTTP to nginx
+[ 3] 3001/tcp on lo             ALLOW IN    Anywhere                   # Allow loopback proxy to payments
+[ 4] 3001/tcp                   ALLOW IN    10.0.1.0/24                # Allow monitoring health checks to payments
+[ 5] 3001/tcp                   DENY IN     Anywhere                   # Deny external direct access to payments service
+[ 6] 22/tcp (v6)                ALLOW IN    Anywhere (v6)              # Allow SSH administration
+[ 7] 80/tcp (v6)                ALLOW IN    Anywhere (v6)              # Allow HTTP to nginx
+[ 8] 3001/tcp (v6) on lo        ALLOW IN    Anywhere (v6)              # Allow loopback proxy to payments
+[ 9] 3001/tcp (v6)              DENY IN     Anywhere (v6)              # Deny external direct access to payments service
+
+
+$ systemctl list-unit-files | grep kk-
+kk-api.service                                 enabled         enabled
+kk-logs.service                                enabled         enabled
+kk-payments.service                            enabled         enabled
+
+$ sudo systemd-analyze security kk-api.service | head -20
+  NAME                                                        DESCRIPTION                                                        EXPOSURE
+✓ RemoveIPC=                                                  Service user cannot leave SysV IPC objects around                  
+✗ RootDirectory=/RootImage=                                   Service runs within the host's root directory                           0.1
+✓ User=/DynamicUser=                                          Service runs under a static non-root user identity                 
+✓ CapabilityBoundingSet=~CAP_SYS_TIME                         Service processes cannot change the system clock                   
+✓ NoNewPrivileges=                                            Service processes cannot acquire new privileges                    
+✓ AmbientCapabilities=                                        Service process does not receive ambient capabilities              
+✗ ProtectControlGroups=                                       Service may modify the control group file system                        0.2
+✓ CapabilityBoundingSet=~CAP_BPF                              Service may load BPF programs                                      
+✓ SystemCallArchitectures=                                    Service may execute system calls only with native ABI              
+✗ RestrictAddressFamilies=~AF_PACKET                          Service may allocate packet sockets                                     0.2
+✗ RestrictAddressFamilies=~AF_NETLINK                         Service may allocate netlink sockets                                    0.1
+✗ RestrictAddressFamilies=~AF_UNIX                            Service may allocate local sockets                                      0.1
+✗ RestrictAddressFamilies=~…                                  Service may allocate exotic sockets                                     0.3
+✗ RestrictAddressFamilies=~AF_(INET|INET6)                    Service may allocate Internet sockets                                   0.3
+✗ RestrictRealtime=                                           Service may acquire realtime scheduling                                 0.1
+✓ ProtectSystem=                                              Service has strict read-only access to the OS file hierarchy       
+✓ SupplementaryGroups=                                        Service has no supplementary groups                                
+✓ CapabilityBoundingSet=~CAP_SYS_RAWIO                        Service has no raw I/O access                                      
+✓ CapabilityBoundingSet=~CAP_SYS_PTRACE                       Service has no ptrace() debugging abilities                        
+
+$ sudo systemd-analyze security kk-logs.service | head -20
+  NAME                                                        DESCRIPTION                                                        EXPOSURE
+✓ RemoveIPC=                                                  Service user cannot leave SysV IPC objects around                  
+✗ RootDirectory=/RootImage=                                   Service runs within the host's root directory                           0.1
+✓ User=/DynamicUser=                                          Service runs under a static non-root user identity                 
+✓ CapabilityBoundingSet=~CAP_SYS_TIME                         Service processes cannot change the system clock                   
+✓ NoNewPrivileges=                                            Service processes cannot acquire new privileges                    
+✓ AmbientCapabilities=                                        Service process does not receive ambient capabilities              
+✗ ProtectControlGroups=                                       Service may modify the control group file system                        0.2
+✓ CapabilityBoundingSet=~CAP_BPF                              Service may load BPF programs                                      
+✓ SystemCallArchitectures=                                    Service may execute system calls only with native ABI              
+✗ RestrictAddressFamilies=~AF_PACKET                          Service may allocate packet sockets                                     0.2
+✗ RestrictAddressFamilies=~AF_NETLINK                         Service may allocate netlink sockets                                    0.1
+✗ RestrictAddressFamilies=~AF_UNIX                            Service may allocate local sockets                                      0.1
+✗ RestrictAddressFamilies=~…                                  Service may allocate exotic sockets                                     0.3
+✗ RestrictAddressFamilies=~AF_(INET|INET6)                    Service may allocate Internet sockets                                   0.3
+✗ RestrictRealtime=                                           Service may acquire realtime scheduling                                 0.1
+✓ ProtectSystem=                                              Service has strict read-only access to the OS file hierarchy       
+✓ SupplementaryGroups=                                        Service has no supplementary groups                                
+✓ CapabilityBoundingSet=~CAP_SYS_RAWIO                        Service has no raw I/O access                                      
+✓ CapabilityBoundingSet=~CAP_SYS_PTRACE                       Service has no ptrace() debugging abilities                        
+
+$ sudo systemd-analyze security kk-payments.service | head -20
+  NAME                                                        DESCRIPTION                                                                                         EXPOSURE
+✓ SystemCallFilter=~@swap                                     System call allow list defined for service, and @swap is not included                               
+✗ SystemCallFilter=~@resources                                System call allow list defined for service, and @resources is included (e.g. ioprio_set is allowed)      0.2
+✓ SystemCallFilter=~@reboot                                   System call allow list defined for service, and @reboot is not included                             
+✓ SystemCallFilter=~@raw-io                                   System call allow list defined for service, and @raw-io is not included                             
+✗ SystemCallFilter=~@privileged                               System call allow list defined for service, and @privileged is included (e.g. chown is allowed)          0.2
+✓ SystemCallFilter=~@obsolete                                 System call allow list defined for service, and @obsolete is not included                           
+✓ SystemCallFilter=~@mount                                    System call allow list defined for service, and @mount is not included                              
+✓ SystemCallFilter=~@module                                   System call allow list defined for service, and @module is not included                             
+✓ SystemCallFilter=~@debug                                    System call allow list defined for service, and @debug is not included                              
+✓ SystemCallFilter=~@cpu-emulation                            System call allow list defined for service, and @cpu-emulation is not included                      
+✓ SystemCallFilter=~@clock                                    System call allow list defined for service, and @clock is not included                              
+✓ RemoveIPC=                                                  Service user cannot leave SysV IPC objects around                                                   
+✗ RootDirectory=/RootImage=                                   Service runs within the host's root directory                                                            0.1
+✓ User=/DynamicUser=                                          Service runs under a static non-root user identity                                                  
+✓ RestrictRealtime=                                           Service realtime scheduling access is restricted                                                    
+✓ CapabilityBoundingSet=~CAP_SYS_TIME                         Service processes cannot change the system clock                                                    
+✓ NoNewPrivileges=                                            Service processes cannot acquire new privileges                                                     
+✓ AmbientCapabilities=                                        Service process does not receive ambient capabilities                                               
+✗ ProtectControlGroups=                                       Service may modify the control group file system                                                         0.2
+
+$ sudo cat /opt/kijanikiosk/health/last-provision.json
+{"timestamp":"2026-04-07T15:00:52+03:00","kk-api":"down","kk-payments":"down","kk-logs":"ok"}
