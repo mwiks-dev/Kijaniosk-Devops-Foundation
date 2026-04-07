@@ -107,5 +107,5 @@ The access model is considered correct only if:
 - access still works after forced logrotate
 
 ## Evidence
-![getfacl output for health, and api directories](Screenshot from 2026-04-07 15-12-32.png)
-![getfacl output for config and shared logs directories](Screenshot from 2026-04-07 15-12-18.png)
+![getfacl output for health, and api directories](Screenshots/Screenshot from 2026-04-07 15-12-32.png)
+![getfacl output for config and shared logs directories](Screenshots/Screenshot from 2026-04-07 15-12-18.png)

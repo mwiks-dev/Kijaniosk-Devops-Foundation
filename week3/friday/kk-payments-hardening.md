@@ -31,4 +31,4 @@ sudo systemctl status kk-payments.service --no-pager
 sudo systemd-analyze security kk-payments.service
 
 ## Evidence
-![output for `sudo systemd-analyze security kk-payments.service`](Screenshot from 2026-04-07 15-25-10.png)
+![output for `sudo systemd-analyze security kk-payments.service`](Screenshots/Screenshot from 2026-04-07 15-25-10.png)
