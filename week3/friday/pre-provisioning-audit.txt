@@ -70,3 +70,15 @@ Archived and active journals take up 1.1G in the file system.
 # - curl is already held
 
 ![Terminal showing partial dirty state before script runs](Screenshot from 2026-04-07 14-18-31.png)
+
+# Interpretation of dirty-state conditions found
+# - kk-api already exists before provisioning: handled in Phase 2 by ensure_user()
+# - kk-payments group existed before provisioning and can conflict with user creation: handled in Phase 2 by explicit user/group checks
+# - kijanikiosk group already exists before provisioning: handled in Phase 2 by ensure_group()
+# - /opt/kijanikiosk directory tree already exists from prior manual setup: handled in Phase 3 by ownership/mode reset
+# - /opt/kijanikiosk/config permissions were intentionally made too open for dirty-state simulation: fixed in Phase 3 by restoring secure ownership and modes
+# - deploy.sh was created with dangerous permissions during dirty-state simulation: fixed in Phase 3 by removing SUID and resetting ownership/mode
+# - ufw contains an extra deny 3001 rule from dirty-state simulation: fixed in Phase 5 by resetting ufw and applying intent-based rules
+# - curl is already held before provisioning: detected in Phase 1 during package/hold validation
+# - kk-* unit files may be absent or partially present depending on previous setup: handled in Phase 4 by rewriting all unit files from the script
+# - ACLs on shared/logs and config may be missing or inconsistent on this VM: fixed in Phase 3 by reapplying the final access model
